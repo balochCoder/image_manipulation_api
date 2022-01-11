@@ -7,6 +7,7 @@ use App\Http\Requests\ResizeImageRequest;
 use App\Http\Resources\V1\ImageManipulationResource;
 use App\Models\Album;
 use App\Models\ImageManipulation;
+use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
@@ -20,13 +21,16 @@ class ImageManipulationController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function index()
+    public function index(Request $request)
     {
-        return ImageManipulationResource::collection(ImageManipulation::paginate());
+        return ImageManipulationResource::collection(ImageManipulation::where('user_id',$request->user()->id)->paginate());
     }
 
-    public function byAlbum(Album $album)
+    public function byAlbum(Request $request, Album $album)
     {
+        if ($request->user()->id != $album->user_id) {
+            return abort(403, 'Unauthorized');
+        }
         $where = [
             'album_id' => $album->id
         ];
@@ -50,11 +54,15 @@ class ImageManipulationController extends Controller
         $data = [
             'type' => ImageManipulation::TYPE_RESIZE,
             'data' => json_encode($all),
-            'user_id' => null,
+            'user_id' => $request->user()->id,
         ];
 
         if (isset($all['album_id'])) {
-            //TODO            
+            $album = Album::find($all['album_id']);
+
+            if ($request->user()->id != $album->user_id) {
+                return abort(403, 'Unauthorized');
+            }
             $data['album_id'] = $all['album_id'];
         }
         $dir = 'images/' . Str::random() . '/';
@@ -89,19 +97,18 @@ class ImageManipulationController extends Controller
         $h = $all['h'] ?? false;
 
 
-        list($width, $height,$image) = $this->getImageWidthAndHeight($w, $h, $originalPath);
+        list($width, $height, $image) = $this->getImageWidthAndHeight($w, $h, $originalPath);
 
-       $resizedFilename = $filename.'-resized.'.$extension;
+        $resizedFilename = $filename . '-resized.' . $extension;
 
-       $image->resize($width,$height)->save($absolutePath.$resizedFilename);
+        $image->resize($width, $height)->save($absolutePath . $resizedFilename);
 
-       $data['output_path'] = $dir.$resizedFilename;
+        $data['output_path'] = $dir . $resizedFilename;
 
 
-       $imageManipulation = ImageManipulation::create($data);
+        $imageManipulation = ImageManipulation::create($data);
 
-       return new ImageManipulationResource($imageManipulation);
-
+        return new ImageManipulationResource($imageManipulation);
     }
 
     /**
@@ -110,8 +117,11 @@ class ImageManipulationController extends Controller
      * @param  \App\Models\ImageManipulation  $imageManipulation
      * @return \Illuminate\Http\Response
      */
-    public function show(ImageManipulation $image)
+    public function show(Request $request, ImageManipulation $image)
     {
+        if ($request->user()->id != $image->user_id) {
+            return abort(403, 'Unauthorized');
+        }
         return new ImageManipulationResource($image);
     }
 
@@ -122,11 +132,14 @@ class ImageManipulationController extends Controller
      * @param  \App\Models\ImageManipulation  $imageManipulation
      * @return \Illuminate\Http\Response
      */
-    public function destroy(ImageManipulation $image)
+    public function destroy(Request $request, ImageManipulation $image)
     {
+        if ($request->user()->id != $image->user_id) {
+            return abort(403, 'Unauthorized');
+        }
         $image->delete();
 
-        return response('',204);
+        return response('', 204);
     }
 
     protected function getImageWidthAndHeight($w, $h, $originalPath)
@@ -149,6 +162,6 @@ class ImageManipulationController extends Controller
             $newHeight = $h ? (float)$h : $originalHeight * $newWidth / $orignalWidth;
         }
 
-        return [$newWidth, $newHeight,$image];
+        return [$newWidth, $newHeight, $image];
     }
 }

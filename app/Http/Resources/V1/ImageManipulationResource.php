@@ -15,8 +15,7 @@ class ImageManipulationResource extends JsonResource
      */
     public function toArray($request)
     {
-        return
-        [
+        return [
             'id' => $this->id,
             'name' => $this->name,
             'type' => $this->type,
@@ -24,9 +23,6 @@ class ImageManipulationResource extends JsonResource
             'output' => URL::to($this->output_path),
             'album_id' => $this->album_id,
             'created_at' => $this->created_at,
-
-
-
         ];
     }
 }
